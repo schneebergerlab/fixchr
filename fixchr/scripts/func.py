@@ -21,13 +21,13 @@ def setlogconfig(lg, fin=''):
                 'formatter': 'stdout',
                 'level': 'WARNING',
             },
-            'log_file': {
-                'class': 'logging.FileHandler',
-                'filename': fin,
-                'mode': 'a',
-                'formatter': 'log_file',
-                'level': lg,
-            },
+            # 'log_file': {
+            #     'class': 'logging.FileHandler',
+            #     'filename': fin,
+            #     'mode': 'a',
+            #     'formatter': 'log_file',
+            #     'level': lg,
+            # },
         },
         'loggers': {
             '': {
@@ -661,6 +661,7 @@ def checkdir(coords, assigned):
     logger = logging.getLogger("checkdir")
     al = coords.copy()
     rv = deque()
+    achrs = np.unique(al.aChr).tolist()
     for achr in achrs:
         dir_range = mergeRanges(np.array(al.loc[(al.aChr == achr) & (al.bChr == assigned[achr]) & (al.bDir == 1), ["aStart", "aEnd"]]))
         dir_len = len(dir_range) + (dir_range[:, 1] - dir_range[:, 0]).sum()

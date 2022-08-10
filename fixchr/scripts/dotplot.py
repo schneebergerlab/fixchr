@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import matplotlib
+matplotlib.use('agg')
+
 def samgetchrsize(sam):
     import pysam
     samfile = pysam.AlignmentFile(sam, "r")
@@ -39,7 +42,7 @@ def drawdotplot(coords, rchrs_len, qchrs_len, out='dotplot.pdf', ragp=None, qagp
     from collections import deque
     from matplotlib import pyplot as plt
     from matplotlib.patches import Rectangle
-    from syri.pyxFiles.synsearchFunctions import samtocoords
+    import numpy as np
 
     # print("reading sam")
     # al = samtocoords(sam)
@@ -142,11 +145,34 @@ def drawdotplot(coords, rchrs_len, qchrs_len, out='dotplot.pdf', ragp=None, qagp
 # END
 
 
-if __name__ == '__main__':
+def dotplot(args):
+    from fixchr.scripts.func import readcoords, readfasta
+    cfin = args.infile.name
+    ref = args.ref.name
+    qry = args.qry.name
+    ftype = args.ftype
+    fout = args.o.name
+
+    coords = readcoords(cfin, ftype=ftype, f=True, cigar=True)
+    coords.to_csv("input_alignments.txt", index=False, header=True, sep='\t')
+    # Get dotplot for initial alignments
+    refg = readfasta(ref)
+    qryg = readfasta(qry)
+    rchrs_len = {k: len(v) for k, v in refg.items()}
+    qchrs_len = {k: len(v) for k, v in qryg.items()}
+    # TODO: Add parsers for AGP files and plot dimensions
+    # drawdotplot(coords, rchrs_len, qchrs_len, out='fout')
+    drawdotplot(coords, rchrs_len, qchrs_len, out=fout, ragp=args.ragp, qagp=args.qagp, minsize=args.m, width=args.W, height=args.H)
+# END
+
+
+def main(cmd):
     import argparse
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    # (sam, out='dotplot.pdf', refagp='', qryagp='', minsize=1000, width=12, height=12)
-    parser.add_argument('sam', help='Input alignments between reference and query in SAM format', type=argparse.FileType('r'))
+    parser = argparse.ArgumentParser("Draw dotplot for whole-genome alignments", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("-c", dest="infile", help="File containing alignment coordinates", type=argparse.FileType('r'), required=True)
+    parser.add_argument("-r", dest="ref", help="Genome A (which is considered as reference for the alignments). Required for local variation (large indels, CNVs) identification.", type=argparse.FileType('r'))
+    parser.add_argument("-q", dest="qry", help="Genome B (which is considered as query for the alignments). Required for local variation (large indels, CNVs) identification.", type=argparse.FileType('r'))
+    parser.add_argument('-F', dest="ftype", help="Input file type. T: Table, S: SAM, B: BAM, P: PAF", default="T", choices=['T', 'S', 'B', 'P'])
     parser.add_argument('-o', dest='o', help='Output file name', type=argparse.FileType('w'), default='dotplot.pdf')
     parser.add_argument('--ragp', dest='ragp', help='Reference .agp file describing contig order and orientation', type=argparse.FileType('r'))
     parser.add_argument('--qagp', dest='qagp', help='Query .agp file describing contig order and orientation', type=argparse.FileType('r'))
@@ -156,6 +182,7 @@ if __name__ == '__main__':
     # TODO: Add parameter to input list of sequences to consider/remove
     args = parser.parse_args()
     # print(args)
-    drawdotplot(args.sam.name, out=args.o.name, ragp=args.ragp, qagp=args.qagp, minsize=args.m, width=args.W, height=args.H)
+    dotplot(args)
+
 
 

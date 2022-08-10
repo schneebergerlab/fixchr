@@ -15,8 +15,8 @@ def fixchr(args):
     import logging
     import os
     import sys
-    from fixchr.func import readcoords, checkdir, revcomp, setlogconfig
-    from fixchr.dotplot import drawdotplot
+    from fixchr.scripts.func import readcoords, readfasta, writefasta, checkdir, revcomp, setlogconfig, homchr
+    from fixchr.scripts.dotplot import drawdotplot
 
     ## Define logger
     setlogconfig(args.log)
@@ -37,30 +37,17 @@ def fixchr(args):
         logger.warning('For specifying output folder use --dir, use --prefix for modifying the output file names. Current --prefix ({}) may result in crashes.'.format(args.prefix))
 
 
-    # Set CIGAR FLAG
-    if args.ftype in ['S', 'B', 'P']:
-        args.cigar = True
-
-
     ###################################################################
     # Read alignments and compare lengths with genome fasta
     ###################################################################
-
-
-    # from syri.scripts.func import readfasta
-    # import numpy as np
-
-
-
-
-    alpaf = 'GCA_900660825.1.paf'
-    albam = 'GCA_900660825.1.sorted.bam'
-    ref = 'TAIR10_Filtered.fasta.gz'
-    qry = 'GCA_900660825.1_Ath.Ler-0.MPIPZ.v1.0_genomic.fna.gz'
+    cfin = args.infile.name
+    ref = args.ref.name
+    qry = args.qry.name
+    ftype = args.ftype
 
     # coords = readcoords(alpaf, ftype='P', filter=args.f, cigar=args.cigar)
     # Read coords
-    coords = readcoords(albam, ftype='B', f=True, cigar=True)
+    coords = readcoords(cfin, ftype=ftype, f=True, cigar=True)
     coords.to_csv("input_alignments.txt", index=False, header=True, sep='\t')
     # Get dotplot for initial alignments
     refg = readfasta(ref)
@@ -74,9 +61,8 @@ def fixchr(args):
 
     coords2, assigned = homchr(coords, rchrs_len, qchrs_len, csize=100000)
     coords2.sort_values(['aChr', 'aStart', 'aEnd'], inplace=True)
-    coords2.to_csv("homologous_chromosome_alignments.txt", index=False, header=True, sep='\t')
-    drawdotplot(coords2, rchrs_len, qchrs_len, out='homologous_selected.pdf')
-
+    coords2.to_csv("homologous_alignments.txt", index=False, header=True, sep='\t')
+    drawdotplot(coords2, rchrs_len, qchrs_len, out='homologous.pdf')
     rv = checkdir(coords2, assigned)
     if len(rv) > 0:
         logger.warning(f"Inverting query chromosomes: {list(rv)}")
@@ -93,5 +79,29 @@ def fixchr(args):
     writefasta(refout, "ref.filtered.fa")
     writefasta(qryout, "qry.filtered.fa")
     logger.info("Finished")
+# END
+
+
+def main(cmd):
+    parser = argparse.ArgumentParser('Filter and reorient genomes to get homologous chromosomes', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    optional = parser._action_groups.pop()
+    required = parser.add_argument_group("Input Files")
+    required.add_argument("-c", dest="infile", help="File containing alignment coordinates", type=argparse.FileType('r'), required=True)
+    required.add_argument("-r", dest="ref", help="Genome A (which is considered as reference for the alignments). Required for local variation (large indels, CNVs) identification.", type=argparse.FileType('r'))
+    required.add_argument("-q", dest="qry", help="Genome B (which is considered as query for the alignments). Required for local variation (large indels, CNVs) identification.", type=argparse.FileType('r'))
+
+    other = parser.add_argument_group("Additional arguments")
+    other.add_argument('-F', dest="ftype", help="Input file type. T: Table, S: SAM, B: BAM, P: PAF", default="T", choices=['T', 'S', 'B', 'P'])
+    other.add_argument('-f', dest='f', help='As a default, low quality and small alignments are filtered out. Use this parameter to use the full list of alignments without any filtering.', default=True, action='store_false')
+    other.add_argument('--dir', dest='dir', help="path to working directory (if not current directory). All files must be in this directory.", action='store')
+    other.add_argument("--prefix", dest="prefix", help="Prefix to add before the output file Names", type=str, default="")
+
+    optional.add_argument("--log", dest="log", help="log level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARN"])
+    optional.add_argument('--version', action='version', version='{version}'.format(version=__version__))
+    parser._action_groups.append(optional)
+    args = parser.parse_args(cmd)
+    fixchr(args)
+# END
+
 
 
