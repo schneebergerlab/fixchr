@@ -44,6 +44,7 @@ def fixchr(args):
     ref = args.ref.name
     qry = args.qry.name
     ftype = args.ftype
+    csize = args.csize
 
     # coords = readcoords(alpaf, ftype='P', filter=args.f, cigar=args.cigar)
     # Read coords
@@ -59,7 +60,7 @@ def fixchr(args):
     # drawdotplot(args.sam.name, out=args.o.name, ragp=args.ragp, qagp=args.qagp,
     #             minsize=args.m, width=args.W, height=args.H)
 
-    coords2, assigned = homchr(coords, rchrs_len, qchrs_len, csize=100000)
+    coords2, assigned = homchr(coords, rchrs_len, qchrs_len, csize=csize)
     coords2.sort_values(['aChr', 'aStart', 'aEnd'], inplace=True)
     coords2.to_csv("homologous_alignments.txt", index=False, header=True, sep='\t')
     drawdotplot(coords2, rchrs_len, qchrs_len, out='homologous.pdf')
@@ -93,6 +94,7 @@ def main(cmd):
     other = parser.add_argument_group("Additional arguments")
     other.add_argument('-F', dest="ftype", help="Input file type. T: Table, S: SAM, B: BAM, P: PAF", default="T", choices=['T', 'S', 'B', 'P'])
     other.add_argument('-f', dest='f', help='As a default, low quality and small alignments are filtered out. Use this parameter to use the full list of alignments without any filtering.', default=True, action='store_false')
+    other.add_argument('--contig_size', dest='csize', help='Minimum contig size. Contigs smaller than this value would be filtered out.', default=100000, type=int)
     other.add_argument('--dir', dest='dir', help="path to working directory (if not current directory). All files must be in this directory.", action='store')
     other.add_argument("--prefix", dest="prefix", help="Prefix to add before the output file Names", type=str, default="")
 
