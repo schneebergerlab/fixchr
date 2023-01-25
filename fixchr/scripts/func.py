@@ -1,3 +1,5 @@
+import logging
+
 def setlogconfig(lg, fin=''):
     """
     :param lg: Log-level
@@ -38,6 +40,45 @@ def setlogconfig(lg, fin=''):
         },
     })
 #END
+
+def mylogger(logname):
+    from hometools.classes import CustomFormatter
+    import logging
+    logger = logging.getLogger(logname)
+    handler = logging.StreamHandler()
+    handler.setFormatter(CustomFormatter())
+    logger.addHandler(handler)
+    logging.basicConfig(level=logging.INFO)
+    logger.propagate = False
+    return logger
+# END
+
+class CustomFormatter(logging.Formatter):
+    '''
+    https://betterstack.com/community/questions/how-to-color-python-logging-output/
+    '''
+
+    grey = "\x1b[0;49;90m"
+    green = "\x1b[0;49;32m"
+    yellow = "\x1b[0;49;93m"
+    red = "\x1b[0;49;31m"
+    bold_red = "\x1b[0;49;31;21m"
+    reset = "\x1b[0m"
+    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+
+    FORMATS = {
+        logging.DEBUG: grey + format + reset,
+        logging.INFO: green + format + reset,
+        logging.WARNING: yellow + format + reset,
+        logging.ERROR: red + format + reset,
+        logging.CRITICAL: bold_red + format + reset
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+# END
 
 def readfasta(f):
     # TODO: This takes too long when used with getchr for large genomes. Try to optimise FASTA reading when the entire genome is not needed.
@@ -596,63 +637,53 @@ def mergeRanges(ranges):
 
 
 def homchr(coords, rchrs_len, qchrs_len, csize=100000):
+    '''
+    Selects alignments corresponding to homologous chromosomes.
+    When the chromosome IDs are different, then the smaller contigs are filtered
+    out.
+    Homologous chromosomes are selected based on the number of bases aligned
+    between them
+    :param coords: Input alignments (pandas.core.frame.DataFrame)
+    :param rchrs_len: Reference chromosome lengths (dict)
+    :param qchrs_len: Query chromosome lengths (dict)
+    :param csize: Contig length threshold (int)
+    :return:
+    '''
     from collections import defaultdict
     import numpy as np
-    import logging
-    logger = logging.getLogger("homchr")
+    # import logging
+    logger = mylogger("homchr")
     if np.unique(coords.aChr).tolist() != np.unique(coords.bChr).tolist():
-        logger.warning('Chromosomes IDs do not match. Trying to fix them.')
+        logger.warning('Chromosomes IDs do not match in the two genomes')
         # Filter contigs smaller than csize
+        logger.debug('Removing smaller contigs.')
         sr = [k for k, v in rchrs_len.items() if v < csize]
         sq = [k for k, v in qchrs_len.items() if v < csize]
         coords2 = coords.loc[~coords.aChr.isin(sr)].copy()
         coords2 = coords2.loc[~coords2.bChr.isin(sq)]
-        chromrmap = defaultdict(dict)
-        chromqmap = defaultdict(dict)
-        for i in np.unique(coords2.bChr):
-            for j in np.unique(coords2.aChr):
-                a = np.array(coords2.loc[(coords2.bChr == i) & (coords2.aChr == j), ["aStart", "aEnd"]])
-                a = mergeRanges(a)
-                chromrmap[j][i] = len(a) + (a[:, 1] - a[:, 0]).sum()
-                a = np.array(coords2.loc[(coords2.bChr == i) & (coords2.aChr == j), ["bStart", "bEnd"]])
-                a = mergeRanges(a)
-                chromqmap[i][j] = len(a) + (a[:, 1] - a[:, 0]).sum()
-        for i in np.unique(coords2.bChr):
-            for j in np.unique(coords2.aChr):
-                a = np.array(coords2.loc[(coords2.bChr == i) & (coords2.aChr == j), ["aStart", "aEnd"]])
-                a = mergeRanges(a)
-                chromrmap[j][i] = len(a) + (a[:, 1] - a[:, 0]).sum()
-        assigned = {}
-        for chrom in chromrmap:
-            qmax = max(chromrmap[chrom].items(), key=lambda x: x[1])[0]
-            rmax = max(chromqmap[qmax].items(), key=lambda x: x[1])[0]
-            if rmax == chrom:
-                assigned[chrom] = qmax
-        coords2 = coords2.loc[coords2.aChr.isin(list(assigned.keys())) & coords2.bChr.isin(list(assigned.values()))]
+    else:
+        coords2 = coords
+    chromrmap = defaultdict(dict)
+    chromqmap = defaultdict(dict)
+    for i in np.unique(coords2.bChr):
+        for j in np.unique(coords2.aChr):
+            a = np.array(coords2.loc[(coords2.bChr == i) & (coords2.aChr == j), ["aStart", "aEnd"]])
+            a = mergeRanges(a)
+            chromrmap[j][i] = len(a) + (a[:, 1] - a[:, 0]).sum()
+            a = np.array(coords2.loc[(coords2.bChr == i) & (coords2.aChr == j), ["bStart", "bEnd"]])
+            a = mergeRanges(a)
+            chromqmap[i][j] = len(a) + (a[:, 1] - a[:, 0]).sum()
+    assigned = {}
+    for chrom in chromrmap:
+        qmax = max(chromrmap[chrom].items(), key=lambda x: x[1])[0]
+        rmax = max(chromqmap[qmax].items(), key=lambda x: x[1])[0]
+        if rmax == chrom:
+            assigned[chrom] = qmax
+    logger.debug('Selecting homologous chromosomes.')
+    coords2 = coords2.loc[coords2.aChr.isin(list(assigned.keys())) & coords2.bChr.isin(list(assigned.values()))]
     return coords2, assigned
 # END
 
-
-# def checkdir(coords, assigned):
-#     import numpy as np
-#
-#     al = coords.copy()
-#
-#     ## Check for presence of directed alignments
-#     achrs = np.unique(al.aChr).tolist()
-#     for achr in achrs:
-#         if al.loc[(al.aChr == achr) & (al.bChr == assigned[achr]) & (al.bDir == 1), ].shape[0] == 0:
-#             hombchr = [k for k, v in chrlink.items() if v == achr]
-#             if len(hombchr) == 1:
-#                 hombchr = hombchr[0]
-#             elif len(hombchr) == 0:
-#                 hombchr = achr
-#             else:
-#                 logger.error('Homologous chromosomes were not identified correctly. Try assigning the chromosome ids manually.')
-#                 sys.exit()
-#             logger.warning('Reference chromosome ' + achr + ' do not have any directed alignments with its homologous chromosome in the query genome (' + hombchr + '). Filtering out all corresponding alignments.')
-#             coords = coords.loc[~(coords.aChr == achr)]
-#             coords = coords.loc[~(coords.bChr == achr)]
 
 def checkdir(coords, assigned):
     import numpy as np
@@ -668,16 +699,7 @@ def checkdir(coords, assigned):
         inv_range = mergeRanges(np.array(al.loc[(al.aChr == achr) & (al.bChr == assigned[achr]) & (al.bDir == -1), ["aStart", "aEnd"]]))
         inv_len = len(inv_range) + (inv_range[:, 1] - inv_range[:, 0]).sum()
         if inv_len > dir_len:
-            # hombchr = [k for k, v in chrlink.items() if v==achr]
-            # if len(hombchr) == 1:
-            #     hombchr = hombchr[0]
-            # elif len(hombchr) == 0:
-            #     hombchr = achr
-            # else:
-            #     logger.error('Homologous chromosomes were not identified correctly. Try assigning the chromosome ids manually.')
-            #     sys.exit()
             rv.append(assigned[achr])
-            # logger.warning('Reference chromosome ' + achr + ' has high fraction of inverted alignments with its homologous chromosome in the query genome (' + hombchr + '). Ensure that same chromosome-strands are being compared in the two genomes, as different strand can result in unexpected errors.')
     return rv
 # END
 

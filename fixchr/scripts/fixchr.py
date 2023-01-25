@@ -12,15 +12,16 @@ from fixchr import __version__
 
 def fixchr(args):
     # Check that correct version of python is being used
-    import logging
+    # import logging
     import os
     import sys
-    from fixchr.scripts.func import readcoords, readfasta, writefasta, checkdir, revcomp, setlogconfig, homchr
+    from fixchr.scripts.func import readcoords, readfasta, writefasta, checkdir, revcomp, setlogconfig, homchr, mylogger
     from fixchr.scripts.dotplot import drawdotplot
 
     ## Define logger
     setlogconfig(args.log)
-    logger = logging.getLogger("fixchr")
+    # logger = logging.getLogger("fixchr")
+    logger = mylogger("fixchr")
 
     # Set CWD and check if it exists
     if args.dir is None:
@@ -48,6 +49,7 @@ def fixchr(args):
 
     # coords = readcoords(alpaf, ftype='P', filter=args.f, cigar=args.cigar)
     # Read coords
+    logger.info('Reading alignments')
     coords = readcoords(cfin, ftype=ftype, f=True, cigar=True)
     coords.to_csv("input_alignments.txt", index=False, header=True, sep='\t')
     # Get dotplot for initial alignments
@@ -59,15 +61,15 @@ def fixchr(args):
     drawdotplot(coords, rchrs_len, qchrs_len, out='input.pdf')
     # drawdotplot(args.sam.name, out=args.o.name, ragp=args.ragp, qagp=args.qagp,
     #             minsize=args.m, width=args.W, height=args.H)
-
+    logger.info('Selecting homologous chromosomes')
     coords2, assigned = homchr(coords, rchrs_len, qchrs_len, csize=csize)
     coords2.sort_values(['aChr', 'aStart', 'aEnd'], inplace=True)
     coords2.to_csv("homologous_alignments.txt", index=False, header=True, sep='\t')
     drawdotplot(coords2, rchrs_len, qchrs_len, out='homologous.pdf')
+    logger.info('Checking chromosome direction')
     rv = checkdir(coords2, assigned)
     if len(rv) > 0:
         logger.warning(f"Inverting query chromosomes: {list(rv)}")
-
     refout = {k: refg[k] for k in assigned.keys()}
     qryout = {k: qryg[k] for k in assigned.values()}
     for k in rv:
@@ -75,6 +77,7 @@ def fixchr(args):
         coords2.loc[coords.bChr == k, 'bStart'] = qchrs_len[k] - coords2.loc[coords.bChr == k, 'bStart'] + 1
         coords2.loc[coords.bChr == k, 'bEnd'] = qchrs_len[k] - coords2.loc[coords.bChr == k, 'bEnd'] + 1
         coords2.loc[coords.bChr == k, ['bStart', 'bEnd']] = coords2.loc[coords.bChr == k, ['bEnd', 'bStart']].to_numpy()
+    logger.info('Writing output files')
     coords2.to_csv("homologous_strand_corrected_alignments.txt", index=False, header=True, sep='\t')
     drawdotplot(coords2, rchrs_len, qchrs_len, out='homologous_strand_corrected.pdf')
     writefasta(refout, "ref.filtered.fa")
