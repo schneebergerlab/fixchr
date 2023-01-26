@@ -1,5 +1,33 @@
 import logging
 
+class CustomFormatter(logging.Formatter):
+    '''
+    https://betterstack.com/community/questions/how-to-color-python-logging-output/
+    '''
+
+    grey = "\x1b[0;49;90m"
+    green = "\x1b[0;49;32m"
+    yellow = "\x1b[0;49;93m"
+    red = "\x1b[0;49;31m"
+    bold_red = "\x1b[0;49;31;21m"
+    reset = "\x1b[0m"
+    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+
+    FORMATS = {
+        logging.DEBUG: grey + format + reset,
+        logging.INFO: green + format + reset,
+        logging.WARNING: yellow + format + reset,
+        logging.ERROR: red + format + reset,
+        logging.CRITICAL: bold_red + format + reset
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+# END
+
+
 def setlogconfig(lg, fin=''):
     """
     :param lg: Log-level
@@ -41,8 +69,9 @@ def setlogconfig(lg, fin=''):
     })
 #END
 
+
 def mylogger(logname):
-    from hometools.classes import CustomFormatter
+    # from hometools.classes import CustomFormatter
     import logging
     logger = logging.getLogger(logname)
     handler = logging.StreamHandler()
@@ -53,32 +82,6 @@ def mylogger(logname):
     return logger
 # END
 
-class CustomFormatter(logging.Formatter):
-    '''
-    https://betterstack.com/community/questions/how-to-color-python-logging-output/
-    '''
-
-    grey = "\x1b[0;49;90m"
-    green = "\x1b[0;49;32m"
-    yellow = "\x1b[0;49;93m"
-    red = "\x1b[0;49;31m"
-    bold_red = "\x1b[0;49;31;21m"
-    reset = "\x1b[0m"
-    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
-
-    FORMATS = {
-        logging.DEBUG: grey + format + reset,
-        logging.INFO: green + format + reset,
-        logging.WARNING: yellow + format + reset,
-        logging.ERROR: red + format + reset,
-        logging.CRITICAL: bold_red + format + reset
-    }
-
-    def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno)
-        formatter = logging.Formatter(log_fmt)
-        return formatter.format(record)
-# END
 
 def readfasta(f):
     # TODO: This takes too long when used with getchr for large genomes. Try to optimise FASTA reading when the entire genome is not needed.
