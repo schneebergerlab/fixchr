@@ -46,11 +46,16 @@ def fixchr(args):
     qry = args.qry.name
     ftype = args.ftype
     csize = args.csize
+    # Set CIGAR FLAG
+    if ftype in ['S', 'B', 'P']:
+        cigar = True
+    elif ftype == 'T':
+        cigar = False
 
     # coords = readcoords(alpaf, ftype='P', filter=args.f, cigar=args.cigar)
     # Read coords
     logger.info('Reading alignments')
-    coords = readcoords(cfin, ftype=ftype, f=True, cigar=True)
+    coords = readcoords(cfin, ftype=ftype, f=True, cigar=cigar)
     coords.to_csv("input_alignments.txt", index=False, header=True, sep='\t')
     # Get dotplot for initial alignments
     refg = readfasta(ref)
