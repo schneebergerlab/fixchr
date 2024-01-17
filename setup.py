@@ -15,5 +15,5 @@ setup(
                 "fixchr.scripts.func",
                 "fixchr.scripts.dotplot"],
     scripts=['bin/fixchr', 'bin/dotplot'],
-    long_description=open('README.rst').read(),
+    long_description=open('README.md').read(),
 )
