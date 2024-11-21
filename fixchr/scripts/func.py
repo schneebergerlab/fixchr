@@ -618,8 +618,12 @@ def mergeRanges(ranges):
     """
     from collections import deque
     import numpy as np
-    if len(ranges) < 2:
+    if len(ranges) == 0:
         return ranges
+    if len(ranges) == 1:
+        return np.array([[ranges[0][1], ranges[0][0]]]) if ranges[0][1] < ranges[0][0] else np.array(ranges)
+    # if len(ranges) < 2:
+    #     return ranges
     for i in ranges:
         if i[0] > i[1]:
             i[1], i[0] = i[0], i[1]
@@ -640,7 +644,7 @@ def mergeRanges(ranges):
 
 
 def homchr(coords, rchrs_len, qchrs_len, csize=100000):
-    '''
+    """
     Selects alignments corresponding to homologous chromosomes.
     When the chromosome IDs are different, then the smaller contigs are filtered
     out.
@@ -651,7 +655,7 @@ def homchr(coords, rchrs_len, qchrs_len, csize=100000):
     :param qchrs_len: Query chromosome lengths (dict)
     :param csize: Contig length threshold (int)
     :return:
-    '''
+    """
     from collections import defaultdict
     import numpy as np
     # import logging
